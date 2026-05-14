@@ -19,12 +19,7 @@ import {
     Text,
     Tooltip,
 } from '@mantine-8/core';
-import {
-    IconGripVertical,
-    IconMinus,
-    IconPlus,
-    IconTrash,
-} from '@tabler/icons-react';
+import { IconGripVertical, IconMinus, IconPlus } from '@tabler/icons-react';
 import { forwardRef, useCallback, useState } from 'react';
 import { type Props } from '.';
 import {
@@ -87,10 +82,6 @@ const Sorting = forwardRef<HTMLDivElement, Props>(({ sorts, isEditMode }) => {
         },
         [dispatch, sorts],
     );
-
-    const removeAllSortFields = useCallback(() => {
-        dispatch(explorerActions.setSortFields([]));
-    }, [dispatch]);
 
     const moveSortFields = useCallback(
         (sourceIndex: number, destinationIndex: number) => {
@@ -235,30 +226,15 @@ const Sorting = forwardRef<HTMLDivElement, Props>(({ sorts, isEditMode }) => {
             {isEditMode && hasAddableSomething && (
                 <>
                     {!isAddingSort ? (
-                        <Group gap="xs">
-                            <Button
-                                variant="light"
-                                color="gray"
-                                size="compact-xs"
-                                onClick={() => setIsAddingSort(true)}
-                                leftSection={<MantineIcon icon={IconPlus} />}
-                            >
-                                Add sort
-                            </Button>
-                            {sorts.length > 0 && (
-                                <Button
-                                    variant="subtle"
-                                    color="red"
-                                    size="compact-xs"
-                                    onClick={removeAllSortFields}
-                                    leftSection={
-                                        <MantineIcon icon={IconTrash} />
-                                    }
-                                >
-                                    Clear all
-                                </Button>
-                            )}
-                        </Group>
+                        <Button
+                            variant="light"
+                            color="gray"
+                            size="compact-xs"
+                            onClick={() => setIsAddingSort(true)}
+                            leftSection={<MantineIcon icon={IconPlus} />}
+                        >
+                            Add sort
+                        </Button>
                     ) : (
                         <Group wrap="nowrap" gap="sm" pl="xs" py="two">
                             {sorts.length > 0 && (
