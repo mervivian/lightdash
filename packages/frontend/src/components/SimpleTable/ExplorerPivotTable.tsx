@@ -11,6 +11,10 @@ import {
     useExplorerSelector,
 } from '../../features/explorer/store';
 import {
+    matchesIdentity,
+    normalizePivotValues,
+} from '../../utils/pivotSortIdentity';
+import {
     getSortDirectionOrder,
     getSortLabel,
     SortDirection,
@@ -23,44 +27,15 @@ type ExplorerPivotTableProps = Omit<
     'sortBy' | 'renderSortMenu'
 >;
 
-type PivotValuesPin = { reference: string; value: unknown }[];
-
-const pivotValuesEqual = (
-    a: SortField['pivotValues'],
-    b: PivotValuesPin,
-): boolean => {
-    if (!a || a.length !== b.length) return false;
-    const lookup = new Map(a.map((p) => [p.reference, p.value]));
-    return b.every(
-        (p) => lookup.has(p.reference) && lookup.get(p.reference) === p.value,
-    );
+// Internal target shape used while resolving a click into an upsert/remove
+// operation. Click-time pivot values are already normalized at the boundary
+// (in `targetIdentity`) so downstream consumers can use shared identity
+// helpers without an extra normalization step.
+type SortTarget = {
+    kind: 'valueColumn' | 'indexDim' | 'groupBy';
+    fieldId: string;
+    pivotValues?: NonNullable<SortField['pivotValues']>;
 };
-
-// Predicate matching the sort entry that targets the same "axis" the user
-// clicked on. An axis is identified by (fieldId, presence-and-shape of
-// pivotValues). Two pivot-column clicks on the same metric but different
-// pinned values target different axes.
-const matchesAxis = (
-    candidate: SortField,
-    target: { fieldId: string; pivotValues?: PivotValuesPin },
-): boolean => {
-    if (candidate.fieldId !== target.fieldId) return false;
-    const candidatePin = candidate.pivotValues ?? [];
-    const targetPin = target.pivotValues ?? [];
-    if (candidatePin.length === 0 && targetPin.length === 0) return true;
-    return pivotValuesEqual(candidate.pivotValues, targetPin);
-};
-
-const normalizePivotValues = (pin: PivotValuesPin) =>
-    pin.map((pv) => ({
-        reference: pv.reference,
-        value:
-            pv.value === null ||
-            typeof pv.value === 'number' ||
-            typeof pv.value === 'string'
-                ? (pv.value as string | number | null)
-                : String(pv.value),
-    }));
 
 const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
     getFieldLabel,
@@ -113,19 +88,12 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
     // Multi-sort management for power users still happens in the SortButton
     // popover above the chart.
     const upsertSort = useCallback(
-        (
-            target: {
-                kind: 'valueColumn' | 'indexDim' | 'groupBy';
-                fieldId: string;
-                pivotValues?: PivotValuesPin;
-            },
-            direction: SortDirection,
-        ) => {
+        (target: SortTarget, direction: SortDirection) => {
             const next: SortField = {
                 fieldId: target.fieldId,
                 descending: direction === SortDirection.DESC,
                 pivotValues: target.pivotValues?.length
-                    ? normalizePivotValues(target.pivotValues)
+                    ? target.pivotValues
                     : undefined,
             };
 
@@ -137,11 +105,11 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
                 if (target.kind === 'indexDim') {
                     return (
                         kind === 'groupBy' ||
-                        (kind === 'indexDim' && !matchesAxis(s, target))
+                        (kind === 'indexDim' && !matchesIdentity(s, target))
                     );
                 }
                 // target.kind === 'groupBy'
-                return kind !== 'groupBy' || !matchesAxis(s, target);
+                return kind !== 'groupBy' || !matchesIdentity(s, target);
             });
 
             dispatch(explorerActions.setSortFields([...filtered, next]));
@@ -150,10 +118,10 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
     );
 
     const removeSort = useCallback(
-        (target: { fieldId: string; pivotValues?: PivotValuesPin }) => {
+        (target: SortTarget) => {
             dispatch(
                 explorerActions.setSortFields(
-                    sorts.filter((s) => !matchesAxis(s, target)),
+                    sorts.filter((s) => !matchesIdentity(s, target)),
                 ),
             );
         },
@@ -165,18 +133,12 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
     }, [dispatch]);
 
     const targetIdentity = useCallback(
-        (
-            target: PivotSortMenuTarget,
-        ): {
-            kind: 'valueColumn' | 'indexDim' | 'groupBy';
-            fieldId: string;
-            pivotValues?: PivotValuesPin;
-        } | null => {
+        (target: PivotSortMenuTarget): SortTarget | null => {
             if (target.kind === 'pivotColumn') {
                 return {
                     kind: 'valueColumn',
                     fieldId: target.metricReference,
-                    pivotValues: target.pivotValues,
+                    pivotValues: normalizePivotValues(target.pivotValues),
                 };
             }
             if (target.kind === 'indexDim') {
@@ -200,7 +162,7 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
             if (!item) {
                 return <Menu.Label>Sort target is not in the chart</Menu.Label>;
             }
-            const existing = sorts.find((s) => matchesAxis(s, identity));
+            const existing = sorts.find((s) => matchesIdentity(s, identity));
             const currentDirection = existing
                 ? existing.descending
                     ? SortDirection.DESC

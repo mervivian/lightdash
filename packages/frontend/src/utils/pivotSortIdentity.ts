@@ -5,6 +5,22 @@ export type PivotSortIdentity = {
     pivotValues?: SortField['pivotValues'];
 };
 
+// Click-time pivot values arrive with `unknown` value (raw warehouse output).
+// `SortField['pivotValues']` only allows string | number | null — narrow by
+// stringifying anything else. Strings, numbers, and null pass through.
+export const normalizePivotValues = (
+    pin: { reference: string; value: unknown }[],
+): NonNullable<SortField['pivotValues']> =>
+    pin.map((pv) => ({
+        reference: pv.reference,
+        value:
+            pv.value === null ||
+            typeof pv.value === 'number' ||
+            typeof pv.value === 'string'
+                ? (pv.value as string | number | null)
+                : String(pv.value),
+    }));
+
 const pivotValuesEqual = (
     a: SortField['pivotValues'],
     b: SortField['pivotValues'],
