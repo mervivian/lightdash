@@ -6,18 +6,13 @@ export type PivotPin = {
     formatted: string;
 };
 
-// Per data-column identity in a pivoted table. `metricFieldId` is the metric
-// rendered in that column (undefined when `metricsAsRows: true` — no metric
-// label row exists). `pivotValues` are the cumulative pivot pin values for
-// the column (e.g. month=2024-11, region=US) in pivot-dimension order.
 export type PivotColumnIdentity = {
+    /** undefined when metricsAsRows: true. */
     metricFieldId: string | undefined;
     pivotValues: PivotPin[];
 };
 
-// Index of the header row that carries metric labels (e.g. "Total order
-// amount" on top of each value column). Returns -1 when there is no such row
-// (i.e. metricsAsRows: true).
+/** -1 when metricsAsRows: true. */
 export const getMetricLabelHeaderRowIndex = (data: PivotData): number => {
     for (let i = data.headerValueTypes.length - 1; i >= 0; i -= 1) {
         if (data.headerValueTypes[i].type === FieldType.METRIC) return i;
@@ -25,10 +20,8 @@ export const getMetricLabelHeaderRowIndex = (data: PivotData): number => {
     return -1;
 };
 
-// Build per data-column identities by walking the header rows once. Each
-// header-row cell maps 1:1 with a data column (merged cells carry the
-// owner's payload with colSpan=0), so we index directly — a colSpan-cursor
-// would double-count merged slots and shift values into the wrong group.
+// Each header-row cell maps 1:1 with a data column (merged cells carry the
+// owner's payload with colSpan=0) — index directly, never by colSpan cursor.
 export const getPivotColumnIdentities = (
     data: PivotData,
 ): PivotColumnIdentity[] => {

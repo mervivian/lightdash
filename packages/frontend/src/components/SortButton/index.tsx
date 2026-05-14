@@ -27,9 +27,7 @@ export type PivotColumnSortOption = {
 export type Props = {
     sorts: SortField[];
     isEditMode: boolean;
-    // Extra Select options for pivot-pinned sorts ("Metric @ pivot=value").
-    // Provided by a pivot-aware wrapper when the chart is pivoted; absent for
-    // the regular results table.
+    /** Extra options for pivot-pinned sorts; omit for non-pivot charts. */
     pivotColumnSortOptions?: PivotColumnSortOption[];
 };
 

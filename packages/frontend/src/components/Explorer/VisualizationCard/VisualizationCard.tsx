@@ -91,9 +91,6 @@ const VisualizationCard: FC<Props> = memo((props) => {
     // Get savedChart from Redux
     const savedChart = useExplorerSelector(selectSavedChart);
 
-    // Active sorts — surfaced in the Chart card header (matching the
-    // Results card pattern) so pivot users can manage sorts without
-    // scrolling the chart body.
     const sorts = useExplorerSelector(selectSorts);
 
     const projectUuid = savedChart?.projectUuid || fallBackUUid;

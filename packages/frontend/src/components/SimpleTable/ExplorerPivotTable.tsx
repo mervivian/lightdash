@@ -27,10 +27,7 @@ type ExplorerPivotTableProps = Omit<
     'sortBy' | 'renderSortMenu'
 >;
 
-// Internal target shape used while resolving a click into an upsert/remove
-// operation. Click-time pivot values are already normalized at the boundary
-// (in `targetIdentity`) so downstream consumers can use shared identity
-// helpers without an extra normalization step.
+// Pivot values normalized at the boundary in `targetIdentity`.
 type SortTarget = {
     kind: 'valueColumn' | 'indexDim' | 'groupBy';
     fieldId: string;
@@ -48,14 +45,10 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
     const isEditMode = useExplorerSelector(selectIsEditMode);
     const metrics = useExplorerSelector(selectMetrics);
 
-    // Classify each sort entry by axis. Determines what gets dropped when a
-    // new sort is added.
-    //   valueColumn: sort whose fieldId is a metric, OR has pivotValues set
-    //                (the pivot "values" axis)
-    //   groupBy:     sort whose fieldId matches a pivot column dimension
-    //   indexDim:    everything else (row dimensions, table calcs)
-    // valueColumn and indexDim both drive ROW order — they replace each
-    // other on add. groupBy drives COLUMN order and is independent.
+    // Sort axes:
+    //   valueColumn — metric or pinned: drives row order (replaces indexDim)
+    //   groupBy     — pivot dimension: drives column order (independent)
+    //   indexDim    — row dimension / table calc: composes with other indexDims
     const metricSet = useMemo(() => new Set(metrics), [metrics]);
     const groupByRefs = useMemo(() => {
         const refs = new Set<string>();
@@ -78,15 +71,10 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
         [groupByRefs, metricSet],
     );
 
-    // Replace the entry matching this axis, applying axis-mutual-exclusion
-    // rules.
-    //   Add valueColumn: drop every valueColumn sort + every index-dim sort
-    //                    (row axis collapses to a single value-column sort).
-    //   Add indexDim:    drop any valueColumn sort, keep other index-dim
-    //                    sorts so they compose as primary/secondary row keys.
-    //   Add groupBy:     drop only the groupBy entry with the same fieldId.
-    // Multi-sort management for power users still happens in the SortButton
-    // popover above the chart.
+    // Add valueColumn → drop all row-axis sorts (valueColumn + indexDim).
+    // Add indexDim    → drop valueColumn, keep other indexDims (composable).
+    // Add groupBy     → drop only the same-fieldId groupBy.
+    // Power users compose multi-key sorts via the SortButton popover.
     const upsertSort = useCallback(
         (target: SortTarget, direction: SortDirection) => {
             const next: SortField = {
@@ -108,7 +96,6 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
                         (kind === 'indexDim' && !matchesIdentity(s, target))
                     );
                 }
-                // target.kind === 'groupBy'
                 return kind !== 'groupBy' || !matchesIdentity(s, target);
             });
 
@@ -144,7 +131,6 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
             if (target.kind === 'indexDim') {
                 return { kind: 'indexDim', fieldId: target.reference };
             }
-            // target.kind === 'groupByDim'
             return { kind: 'groupBy', fieldId: target.reference };
         },
         [],
@@ -169,10 +155,6 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
                     : SortDirection.ASC
                 : undefined;
 
-            // Match the visual + behavior of ColumnHeaderSortMenuOptions in
-            // the regular results table: direction order and labels come from
-            // sortUtils so "Sort 1-9" / "Sort Old-New" / "Sort True-False"
-            // render correctly per field type.
             return (
                 <>
                     <Menu.Label>Sorting</Menu.Label>
@@ -232,11 +214,7 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
             getFieldLabel={getFieldLabel}
             getField={getField}
             sortBy={sorts}
-            // Sort UI is frozen in view mode — sort indicators still render
-            // (so users can see what's active) but clicking a header doesn't
-            // do anything. Matches the regular results table's view-mode
-            // behavior. The SortButton popover above is also gated on
-            // isEditMode so the lock is consistent across surfaces.
+            // View mode: indicators render, clicks are no-ops.
             renderSortMenu={isEditMode ? renderSortMenu : undefined}
         />
     );

@@ -42,8 +42,6 @@ import MantineIcon from '../common/MantineIcon';
 import { DraggablePortalHandler } from '../VisualizationConfigs/TreemapConfig/DraggablePortalHandler';
 import SortItem from './SortItem';
 
-// Encoding helpers for the Select option `value` — Select values are strings,
-// so we serialize identity tuples and parse them back on change.
 type IdentityWithItem = PivotSortIdentity & {
     item: Field | TableCalculation | CustomDimension;
     label: string;
@@ -63,14 +61,8 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
     ({ sorts, isEditMode, pivotColumnSortOptions }) => {
         const columns = useColumns();
         const [isAddingSort, setIsAddingSort] = useState(false);
-        // Cascading state for the pivot-aware Add Sort flow.
-        //   pendingFieldId: column the user picked in step 1 (a metric with
-        //     pivot pins available). Once set, the inline pin picker shows.
-        //     Null when the chart isn't pivoted, or the user picked a column
-        //     that can't be pinned — in those cases step 1 auto-adds.
-        //   pendingPinKey: encoded identity of the pivot pin chosen in step 2.
-        //     Empty string means "no pin" — sort applies to the metric across
-        //     all pivot columns.
+        // Step 1 picks a metric (shows pin picker), step 2 picks a pin
+        // (empty = no pin). Non-pivot picks auto-add in step 1.
         const [pendingFieldId, setPendingFieldId] = useState<string | null>(
             null,
         );
@@ -91,20 +83,17 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
                     ...(identity.pivotValues?.length && {
                         pivotValues: identity.pivotValues,
                     }),
-                    // Preserve nullsFirst if it exists
                     ...(existingSort?.nullsFirst !== undefined && {
                         nullsFirst: existingSort.nullsFirst,
                     }),
                 };
 
                 if (existingSort) {
-                    // Replace in place to preserve order
                     const newSorts = sorts.map((s) =>
                         matchesIdentity(s, identity) ? newSort : s,
                     );
                     dispatch(explorerActions.setSortFields(newSorts));
                 } else {
-                    // Add new sort at the end
                     dispatch(
                         explorerActions.setSortFields([...sorts, newSort]),
                     );
@@ -153,7 +142,6 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
             moveSortFields(result.source.index, result.destination.index);
         };
 
-        // Regular (unpinned) options come from the metric query columns.
         const regularOptions: IdentityWithItem[] = columns
             .map((c) => {
                 const item = c.meta?.item;
@@ -169,10 +157,6 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
             })
             .filter((c): c is IdentityWithItem => c !== null);
 
-        // Pivot pins are grouped by metric so the picker can offer them as a
-        // cascading step: pick the metric in step 1, then optionally pick a
-        // pin from that metric's available columns in step 2. Flattening into
-        // a single Select doesn't scale past a handful of pivot columns.
         const pinsByMetric = new Map<string, PivotColumnSortOption[]>();
         for (const opt of pivotColumnSortOptions ?? []) {
             const bucket = pinsByMetric.get(opt.fieldId);
@@ -180,9 +164,7 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
             else pinsByMetric.set(opt.fieldId, [opt]);
         }
 
-        // Step 1 (column picker): regular columns, dropping any whose
-        // *unpinned* identity already has a sort entry. Metrics that have
-        // pivot pins available stay listed even if an unpinned sort exists,
+        // Keep metrics with pins listed even when already sorted unpinned —
         // so the user can add a pinned variant of an already-sorted metric.
         const step1Options = regularOptions
             .filter((opt) => {
@@ -193,8 +175,6 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
             })
             .map((opt) => ({ value: opt.fieldId, label: opt.label }));
 
-        // Step 2 (pin picker): only shown when pendingFieldId is a metric
-        // with pins available. Excludes pins already used for this metric.
         const pendingPins = pendingFieldId
             ? (pinsByMetric.get(pendingFieldId) ?? [])
             : [];
@@ -216,10 +196,7 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
                 label: p.label,
             }));
 
-        // Whether the unpinned identity for the pending metric is still
-        // available — used to decide if the "no pin" path is meaningful in
-        // step 2. (When an unpinned sort already exists, picking "no pin"
-        // would be a no-op replace.)
+        // Disables the "no pin" path when its identity is already sorted.
         const pendingUnpinnedTaken = pendingFieldId
             ? sorts.some((s) => matchesIdentity(s, { fieldId: pendingFieldId }))
             : false;
@@ -232,9 +209,6 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
 
         const handleStep1Change = (value: string | null) => {
             if (!value) return;
-            // If this column is a metric with pivot pins, stage it and let
-            // the user pick a pin in step 2. Otherwise add immediately —
-            // preserves the snappy one-click flow for non-pivot cases.
             if (pinsByMetric.has(value)) {
                 setPendingFieldId(value);
                 setPendingPinKey('');
@@ -347,13 +321,6 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
                     </Droppable>
                 </DragDropContext>
 
-                {/*
-                Add sort UI. Two layouts:
-                  - Single Select (status quo): non-pivot charts or columns
-                    that can't be pinned. Picking auto-adds.
-                  - Cascading (column → pin): pivot charts when the picked
-                    column is a metric with pins. User explicitly confirms.
-            */}
                 {isEditMode && hasAddableSomething && (
                     <>
                         {!isAddingSort ? (
@@ -403,13 +370,7 @@ const Sorting = forwardRef<HTMLDivElement, Props>(
                                         value={pendingFieldId}
                                         onChange={handleStep1Change}
                                         flex={1}
-                                        // Render the dropdown inline so its
-                                        // clicks count as inside the parent
-                                        // SortButton Popover — otherwise
-                                        // Mantine's outside-click handler
-                                        // closes the popover the moment the
-                                        // user picks an option, killing the
-                                        // cascading flow.
+                                        // Inline so its clicks count as inside the parent Popover.
                                         comboboxProps={{ withinPortal: false }}
                                     />
                                     <Tooltip label="Cancel">

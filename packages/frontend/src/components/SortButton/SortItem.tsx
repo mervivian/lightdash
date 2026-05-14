@@ -65,11 +65,6 @@ const SortItem = forwardRef<HTMLDivElement, SortItemProps>(
 
         const selectedSortNullsFirst = getSortNullsFirstValue(sort);
 
-        // Resolve nice labels + formatted values for the pivot pin segments
-        // so they read e.g. "@ Order date month=2024-11" instead of the raw
-        // "@ orders_order_date_month = 2024-11-01T00:00:00Z" stored on the
-        // sort entry. Falls back to the raw reference when the dim field
-        // can't be resolved (e.g. it was removed from the chart query).
         const columns = useColumns();
         const pivotLabel = useMemo(() => {
             if (!sort.pivotValues?.length) return null;

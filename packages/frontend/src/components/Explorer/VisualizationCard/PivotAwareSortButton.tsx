@@ -14,11 +14,8 @@ type Props = {
     isEditMode: boolean;
 };
 
-// Wrapper around SortButton that, when the chart is a pivot table, enriches
-// the Add Sort Select with one option per (metric, pivotValues) pair currently
-// rendered in the pivot. Plain SortButton is preserved for non-pivoted charts
-// and other consumers (e.g. ResultsCard) — they pass no pivotColumnSortOptions
-// and get the original behavior unchanged.
+// Adds one option per rendered (metric, pivotValues) pair to SortButton's
+// Add Sort picker. Non-pivot charts get plain SortButton behavior.
 const PivotAwareSortButton: FC<Props> = ({ sorts, isEditMode }) => {
     const { visualizationConfig, itemsMap } = useVisualizationContext();
 
@@ -28,8 +25,7 @@ const PivotAwareSortButton: FC<Props> = ({ sorts, isEditMode }) => {
         if (!isTableVisualizationConfig(visualizationConfig)) return undefined;
         const data = visualizationConfig.chartConfig.pivotTableData?.data;
         if (!data) return undefined;
-        // metricsAsRows: true keeps metrics on the row axis, so there's no
-        // metric-label column header to pin against. Out of scope for now.
+        // No metric-label row → metricsAsRows: true (not supported here).
         if (getMetricLabelHeaderRowIndex(data) < 0) return undefined;
 
         const identities = getPivotColumnIdentities(data);

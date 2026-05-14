@@ -143,11 +143,8 @@ const Explorer: FC<{ hideHeader?: boolean }> = memo(
 
         const defaultSort = useDefaultSortField(chartVersionForSort as any);
 
-        // Auto-apply a default sort on first reach of each explore so freshly
-        // opened tables aren't ordered arbitrarily. Only seed ONCE per
-        // tableName — without the guard this effect re-fires whenever the
-        // user clears all sorts, undoing their intent. Re-arms when the user
-        // switches explores.
+        // Seed the default sort once per explore; without this guard, clearing
+        // all sorts would re-seed and override the user's intent.
         const lastSeededTableRef = useRef<string | null>(null);
         useEffect(() => {
             if (!tableName) return;

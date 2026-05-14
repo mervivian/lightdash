@@ -5,9 +5,7 @@ export type PivotSortIdentity = {
     pivotValues?: SortField['pivotValues'];
 };
 
-// Click-time pivot values arrive with `unknown` value (raw warehouse output).
-// `SortField['pivotValues']` only allows string | number | null — narrow by
-// stringifying anything else. Strings, numbers, and null pass through.
+// Narrow `unknown` warehouse values to `SortField['pivotValues']` element type.
 export const normalizePivotValues = (
     pin: { reference: string; value: unknown }[],
 ): NonNullable<SortField['pivotValues']> =>
@@ -34,8 +32,7 @@ const pivotValuesEqual = (
     );
 };
 
-// Two sort entries target the same "axis" when they share the same fieldId
-// AND identify the same pivot pin (both unpinned, or matching pivotValues).
+/** Same fieldId + same pin (both unpinned counts as equal). */
 export const matchesIdentity = (
     candidate: SortField,
     target: PivotSortIdentity,
@@ -43,8 +40,7 @@ export const matchesIdentity = (
     candidate.fieldId === target.fieldId &&
     pivotValuesEqual(candidate.pivotValues, target.pivotValues);
 
-// Stable string key for React lists / Draggable IDs. Two entries with the
-// same fieldId but different pivotValues produce different keys.
+/** Stable string key for React lists / Draggable IDs. */
 export const serializeIdentity = (identity: PivotSortIdentity): string => {
     if (!identity.pivotValues?.length) return identity.fieldId;
     const pinKey = identity.pivotValues

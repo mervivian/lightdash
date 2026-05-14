@@ -282,11 +282,7 @@ const SimpleTable: FC<SimpleTableProps> = ({
             >
                 {pivotTableData.data && resultsData?.hasFetchedAllRows ? (
                     <>
-                        {/* In Explorer mode the wrapped variant adds
-                         * sort-by-pivot-column wiring (reads sortBy from the
-                         * explorer store, dispatches setSortFields on header
-                         * click). Dashboard mode renders the plain table
-                         * because the explorer store isn't mounted there. */}
+                        {/* Dashboard mode has no explorer store — use plain table. */}
                         {isDashboard ? (
                             <PivotTable
                                 className={className}
