@@ -1031,6 +1031,28 @@ const PivotTable: FC<PivotTableProps> = ({
                                           )
                                         : undefined;
 
+                                const titleInnerContent =
+                                    titleField?.fieldId ? (
+                                        titleSortIcon ? (
+                                            <Group
+                                                display="inline-flex"
+                                                spacing={4}
+                                                noWrap
+                                                align="center"
+                                            >
+                                                {getFieldLabel(
+                                                    titleField.fieldId,
+                                                )}
+                                                <MantineIcon
+                                                    icon={titleSortIcon}
+                                                    size={14}
+                                                />
+                                            </Group>
+                                        ) : (
+                                            getFieldLabel(titleField.fieldId)
+                                        )
+                                    ) : undefined;
+
                                 const titleWidthKey = titleField?.fieldId;
                                 const titleWidth = titleWidthKey
                                     ? columnProperties[titleWidthKey]?.width
@@ -1120,28 +1142,7 @@ const PivotTable: FC<PivotTableProps> = ({
                                                         role="button"
                                                         tabIndex={0}
                                                     >
-                                                        {titleSortIcon ? (
-                                                            <Group
-                                                                display="inline-flex"
-                                                                spacing={4}
-                                                                noWrap
-                                                                align="center"
-                                                            >
-                                                                {getFieldLabel(
-                                                                    titleField.fieldId,
-                                                                )}
-                                                                <MantineIcon
-                                                                    icon={
-                                                                        titleSortIcon
-                                                                    }
-                                                                    size={14}
-                                                                />
-                                                            </Group>
-                                                        ) : (
-                                                            getFieldLabel(
-                                                                titleField.fieldId,
-                                                            )
-                                                        )}
+                                                        {titleInnerContent}
                                                     </Box>
                                                 </Menu.Target>
                                                 <Menu.Dropdown>
@@ -1150,9 +1151,9 @@ const PivotTable: FC<PivotTableProps> = ({
                                                     )}
                                                 </Menu.Dropdown>
                                             </Menu>
-                                        ) : titleField?.fieldId ? (
-                                            getFieldLabel(titleField?.fieldId)
-                                        ) : undefined}
+                                        ) : (
+                                            titleInnerContent
+                                        )}
                                         {canResizeTitle && (
                                             <div
                                                 className={
