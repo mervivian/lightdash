@@ -57,10 +57,10 @@ import MantineIcon from '../../common/MantineIcon';
 import LightdashVisualization from '../../LightdashVisualization';
 import VisualizationProvider from '../../LightdashVisualization/VisualizationProvider';
 import { type EchartsSeriesClickEvent } from '../../SimpleChart';
+import SortButton from '../../SortButton';
 import { VisualizationConfigPortalId } from '../ExplorePanel/constants';
 import { DevCopyChartDebugData } from '../ExplorerHeader/DevCopyChartDebugData';
 import VisualizationConfig from '../VisualizationCard/VisualizationConfig';
-import PivotAwareSortButton from './PivotAwareSortButton';
 import { SeriesContextMenu } from './SeriesContextMenu';
 import VisualizationTimezone from './VisualizationTimezone';
 import VisualizationWarning from './VisualizationWarning';
@@ -356,7 +356,7 @@ const VisualizationCard: FC<Props> = memo((props) => {
                         isOpen && (
                             <>
                                 {sorts.length > 0 && (
-                                    <PivotAwareSortButton
+                                    <SortButton
                                         sorts={sorts}
                                         isEditMode={isEditMode}
                                     />

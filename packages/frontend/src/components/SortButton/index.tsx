@@ -1,10 +1,4 @@
-import {
-    isField,
-    type CustomDimension,
-    type Field,
-    type SortField,
-    type TableCalculation,
-} from '@lightdash/common';
+import { isField, type SortField } from '@lightdash/common';
 import { Badge, Group, Popover, Text } from '@mantine-8/core';
 import {
     IconArrowDown,
@@ -17,25 +11,12 @@ import MantineIcon from '../common/MantineIcon';
 import classes from './SortButton.module.css';
 import Sorting from './Sorting';
 
-export type PivotColumnSortOption = {
-    fieldId: string;
-    pivotValues: NonNullable<SortField['pivotValues']>;
-    label: string;
-    item: Field | TableCalculation | CustomDimension;
-};
-
 export type Props = {
     sorts: SortField[];
     isEditMode: boolean;
-    /** Extra options for pivot-pinned sorts; omit for non-pivot charts. */
-    pivotColumnSortOptions?: PivotColumnSortOption[];
 };
 
-const SortButton: FC<Props> = ({
-    sorts,
-    isEditMode,
-    pivotColumnSortOptions,
-}) => {
+const SortButton: FC<Props> = ({ sorts, isEditMode }) => {
     const columns = useColumns();
 
     const getSortText = () => {
@@ -86,11 +67,7 @@ const SortButton: FC<Props> = ({
             </Popover.Target>
 
             <Popover.Dropdown p="xs">
-                <Sorting
-                    sorts={sorts}
-                    isEditMode={isEditMode}
-                    pivotColumnSortOptions={pivotColumnSortOptions}
-                />
+                <Sorting sorts={sorts} isEditMode={isEditMode} />
             </Popover.Dropdown>
         </Popover>
     );
