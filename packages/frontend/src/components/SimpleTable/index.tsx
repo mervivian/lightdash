@@ -21,6 +21,7 @@ import { useVisualizationContext } from '../LightdashVisualization/useVisualizat
 import CellContextMenu from './CellContextMenu';
 import DashboardCellContextMenu from './DashboardCellContextMenu';
 import DashboardHeaderContextMenu from './DashboardHeaderContextMenu';
+import ExplorerPivotTable from './ExplorerPivotTable';
 import MinimalCellContextMenu from './MinimalCellContextMenu';
 
 type SimpleTableProps = {
@@ -281,23 +282,50 @@ const SimpleTable: FC<SimpleTableProps> = ({
             >
                 {pivotTableData.data && resultsData?.hasFetchedAllRows ? (
                     <>
-                        <PivotTable
-                            className={className}
-                            data={pivotTableData.data}
-                            isMinimal={minimal}
-                            isDashboard={isDashboard}
-                            conditionalFormattings={conditionalFormattings}
-                            minMaxMap={minMaxMap}
-                            getFieldLabel={getFieldLabel}
-                            getField={getField}
-                            hideRowNumbers={hideRowNumbers}
-                            showSubtotals={showSubtotals}
-                            columnProperties={
-                                visualizationConfig.chartConfig.columnProperties
-                            }
-                            onColumnWidthChange={onColumnWidthChange}
-                            {...rest}
-                        />
+                        {/* In Explorer mode the wrapped variant adds
+                         * sort-by-pivot-column wiring (reads sortBy from the
+                         * explorer store, dispatches setSortFields on header
+                         * click). Dashboard mode renders the plain table
+                         * because the explorer store isn't mounted there. */}
+                        {isDashboard ? (
+                            <PivotTable
+                                className={className}
+                                data={pivotTableData.data}
+                                isMinimal={minimal}
+                                isDashboard={isDashboard}
+                                conditionalFormattings={conditionalFormattings}
+                                minMaxMap={minMaxMap}
+                                getFieldLabel={getFieldLabel}
+                                getField={getField}
+                                hideRowNumbers={hideRowNumbers}
+                                showSubtotals={showSubtotals}
+                                columnProperties={
+                                    visualizationConfig.chartConfig
+                                        .columnProperties
+                                }
+                                onColumnWidthChange={onColumnWidthChange}
+                                {...rest}
+                            />
+                        ) : (
+                            <ExplorerPivotTable
+                                className={className}
+                                data={pivotTableData.data}
+                                isMinimal={minimal}
+                                isDashboard={isDashboard}
+                                conditionalFormattings={conditionalFormattings}
+                                minMaxMap={minMaxMap}
+                                getFieldLabel={getFieldLabel}
+                                getField={getField}
+                                hideRowNumbers={hideRowNumbers}
+                                showSubtotals={showSubtotals}
+                                columnProperties={
+                                    visualizationConfig.chartConfig
+                                        .columnProperties
+                                }
+                                onColumnWidthChange={onColumnWidthChange}
+                                {...rest}
+                            />
+                        )}
                         {showResultsTotal && (
                             <Flex justify="flex-end" pt="xxs" align="center">
                                 <ResultCount

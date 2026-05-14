@@ -34,6 +34,7 @@ import {
     selectIsVisualizationConfigOpen,
     selectIsVisualizationExpanded,
     selectSavedChart,
+    selectSorts,
     selectTableCalculationsMetadata,
     selectUnsavedChartVersion,
     selectUnsavedColorPaletteUuid,
@@ -59,6 +60,7 @@ import { type EchartsSeriesClickEvent } from '../../SimpleChart';
 import { VisualizationConfigPortalId } from '../ExplorePanel/constants';
 import { DevCopyChartDebugData } from '../ExplorerHeader/DevCopyChartDebugData';
 import VisualizationConfig from '../VisualizationCard/VisualizationConfig';
+import PivotAwareSortButton from './PivotAwareSortButton';
 import { SeriesContextMenu } from './SeriesContextMenu';
 import VisualizationTimezone from './VisualizationTimezone';
 import VisualizationWarning from './VisualizationWarning';
@@ -88,6 +90,11 @@ const VisualizationCard: FC<Props> = memo((props) => {
 
     // Get savedChart from Redux
     const savedChart = useExplorerSelector(selectSavedChart);
+
+    // Active sorts — surfaced in the Chart card header (matching the
+    // Results card pattern) so pivot users can manage sorts without
+    // scrolling the chart body.
+    const sorts = useExplorerSelector(selectSorts);
 
     const projectUuid = savedChart?.projectUuid || fallBackUUid;
     const stagedColorPaletteUuid = useExplorerSelector(
@@ -350,17 +357,27 @@ const VisualizationCard: FC<Props> = memo((props) => {
                     onToggle={toggleSection}
                     headerElement={
                         isOpen && (
-                            <VisualizationWarning
-                                dirtyPivotConfiguration={
-                                    dirtyPivotConfiguration
-                                }
-                                chartConfig={unsavedChartVersion.chartConfig}
-                                resultsData={resultsData}
-                                isLoading={isLoadingQueryResults}
-                                maxColumnLimit={
-                                    health.data?.pivotTable?.maxColumnLimit
-                                }
-                            />
+                            <>
+                                {sorts.length > 0 && (
+                                    <PivotAwareSortButton
+                                        sorts={sorts}
+                                        isEditMode={isEditMode}
+                                    />
+                                )}
+                                <VisualizationWarning
+                                    dirtyPivotConfiguration={
+                                        dirtyPivotConfiguration
+                                    }
+                                    chartConfig={
+                                        unsavedChartVersion.chartConfig
+                                    }
+                                    resultsData={resultsData}
+                                    isLoading={isLoadingQueryResults}
+                                    maxColumnLimit={
+                                        health.data?.pivotTable?.maxColumnLimit
+                                    }
+                                />
+                            </>
                         )
                     }
                     rightHeaderElement={
