@@ -6,6 +6,8 @@ export type PivotSortIdentity = {
 };
 
 // Narrow `unknown` warehouse values to `SortField['pivotValues']` element type.
+// Booleans round-trip natively so downstream SQL emits TRUE/FALSE instead of
+// quoted 'true'/'false' (which BigQuery rejects against BOOL columns).
 export const normalizePivotValues = (
     pin: { reference: string; value: unknown }[],
 ): NonNullable<SortField['pivotValues']> =>
@@ -14,8 +16,9 @@ export const normalizePivotValues = (
         value:
             pv.value === null ||
             typeof pv.value === 'number' ||
-            typeof pv.value === 'string'
-                ? (pv.value as string | number | null)
+            typeof pv.value === 'string' ||
+            typeof pv.value === 'boolean'
+                ? (pv.value as string | number | boolean | null)
                 : String(pv.value),
     }));
 
