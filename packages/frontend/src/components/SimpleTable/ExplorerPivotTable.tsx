@@ -1,4 +1,5 @@
 import { FieldType, type SortField } from '@lightdash/common';
+import { Menu } from '@mantine-8/core';
 import { useCallback, useMemo, type ComponentProps, type FC } from 'react';
 import {
     explorerActions,
@@ -11,13 +12,15 @@ import {
 import {
     matchesIdentity,
     normalizePivotValues,
+    pivotValuesEqual,
 } from '../../utils/pivotSortIdentity';
-import { getSortDirectionOrder, SortDirection } from '../../utils/sortUtils';
-import PivotTable, { type PivotSortClickTarget } from '../common/PivotTable';
+import { SortDirection } from '../../utils/sortUtils';
+import PivotTable, { type PivotSortMenuTarget } from '../common/PivotTable';
+import ColumnHeaderSortMenuOptions from '../Explorer/ResultsCard/ColumnHeaderSortMenuOptions';
 
 type ExplorerPivotTableProps = Omit<
     ComponentProps<typeof PivotTable>,
-    'sortBy' | 'onHeaderSortClick'
+    'sortBy' | 'renderSortMenu'
 >;
 
 type SortTarget = {
@@ -61,8 +64,8 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
         [groupByRefs, metricSet],
     );
 
-    const targetFromClick = useCallback(
-        (target: PivotSortClickTarget): SortTarget => {
+    const targetFromMenuTarget = useCallback(
+        (target: PivotSortMenuTarget): SortTarget => {
             if (target.kind === 'pivotColumn') {
                 return {
                     kind: 'valueColumn',
@@ -78,54 +81,37 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
         [],
     );
 
-    const handleHeaderSortClick = useCallback(
-        (click: PivotSortClickTarget) => {
-            const target = targetFromClick(click);
-            const item = getField?.(target.fieldId);
-            if (!item) return;
-            const defaultDirection = getSortDirectionOrder(item)[0];
-            const existing = sorts.find((s) => matchesIdentity(s, target));
-
-            // Cycle on the same identity: add → flip → remove.
-            if (existing) {
-                const wasDefault =
-                    (existing.descending
-                        ? SortDirection.DESC
-                        : SortDirection.ASC) === defaultDirection;
-                if (wasDefault) {
-                    dispatch(
-                        explorerActions.setSortFields(
-                            sorts.map((s) =>
-                                matchesIdentity(s, target)
-                                    ? { ...s, descending: !s.descending }
-                                    : s,
-                            ),
-                        ),
-                    );
-                } else {
-                    dispatch(
-                        explorerActions.setSortFields(
-                            sorts.filter((s) => !matchesIdentity(s, target)),
-                        ),
-                    );
-                }
-                return;
-            }
-
+    const applySort = useCallback(
+        (target: SortTarget, direction: SortDirection) => {
             const next: SortField = {
                 fieldId: target.fieldId,
-                descending: defaultDirection === SortDirection.DESC,
+                descending: direction === SortDirection.DESC,
                 pivotValues: target.pivotValues?.length
                     ? target.pivotValues
                     : undefined,
             };
 
+            const existing = sorts.find((s) => matchesIdentity(s, target));
+            if (existing) {
+                dispatch(
+                    explorerActions.setSortFields(
+                        sorts.map((s) =>
+                            matchesIdentity(s, target) ? next : s,
+                        ),
+                    ),
+                );
+                return;
+            }
+
             const filtered = sorts.filter((s) => {
                 const kind = classifySort(s);
                 if (target.kind === 'valueColumn') {
-                    // Compose with same-metric valueColumns; replace different-metric.
+                    // Same pivot group composes; different group replaces.
                     if (kind === 'valueColumn') {
-                        return s.fieldId === target.fieldId;
+                        return pivotValuesEqual(
+                            s.pivotValues,
+                            target.pivotValues,
+                        );
                     }
                     return kind === 'groupBy';
                 }
@@ -140,7 +126,44 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
 
             dispatch(explorerActions.setSortFields([...filtered, next]));
         },
-        [classifySort, dispatch, getField, sorts, targetFromClick],
+        [classifySort, dispatch, sorts],
+    );
+
+    const removeSort = useCallback(
+        (target: SortTarget) => {
+            dispatch(
+                explorerActions.setSortFields(
+                    sorts.filter((s) => !matchesIdentity(s, target)),
+                ),
+            );
+        },
+        [dispatch, sorts],
+    );
+
+    const renderSortMenu = useCallback(
+        (menuTarget: PivotSortMenuTarget) => {
+            const target = targetFromMenuTarget(menuTarget);
+            const item = getField?.(target.fieldId);
+            if (!item) {
+                return <Menu.Label>Sort target is not in the chart</Menu.Label>;
+            }
+            const existing = sorts.find((s) => matchesIdentity(s, target));
+            const selectedDirection = existing
+                ? existing.descending
+                    ? SortDirection.DESC
+                    : SortDirection.ASC
+                : undefined;
+
+            return (
+                <ColumnHeaderSortMenuOptions
+                    item={item}
+                    selectedDirection={selectedDirection}
+                    onSelect={(direction) => applySort(target, direction)}
+                    onRemove={() => removeSort(target)}
+                />
+            );
+        },
+        [applySort, getField, removeSort, sorts, targetFromMenuTarget],
     );
 
     return (
@@ -150,7 +173,7 @@ const ExplorerPivotTable: FC<ExplorerPivotTableProps> = ({
             getFieldLabel={getFieldLabel}
             getField={getField}
             sortBy={sorts}
-            onHeaderSortClick={isEditMode ? handleHeaderSortClick : undefined}
+            renderSortMenu={isEditMode ? renderSortMenu : undefined}
         />
     );
 };

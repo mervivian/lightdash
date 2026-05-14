@@ -19,7 +19,7 @@ export const normalizePivotValues = (
                 : String(pv.value),
     }));
 
-const pivotValuesEqual = (
+export const pivotValuesEqual = (
     a: SortField['pivotValues'],
     b: SortField['pivotValues'],
 ): boolean => {

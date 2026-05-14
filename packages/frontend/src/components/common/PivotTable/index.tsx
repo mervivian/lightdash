@@ -21,6 +21,7 @@ import {
     type ResultValue,
     type SortField,
 } from '@lightdash/common';
+import { Menu } from '@mantine-8/core';
 import {
     Box,
     Button,
@@ -165,11 +166,11 @@ type PivotTableProps = BoxProps & // TODO: remove this
         isDashboard?: boolean;
         onColumnWidthChange?: (fieldId: string, width: number) => void;
         sortBy?: SortField[];
-        /** Absent → headers are non-interactive. */
-        onHeaderSortClick?: (target: PivotSortClickTarget) => void;
+        /** Renders inside a Mantine Menu opened by clicking sortable headers. */
+        renderSortMenu?: (target: PivotSortMenuTarget) => React.ReactNode;
     };
 
-export type PivotSortClickTarget =
+export type PivotSortMenuTarget =
     | {
           kind: 'pivotColumn';
           dataColIndex: number;
@@ -193,7 +194,7 @@ const PivotTable: FC<PivotTableProps> = ({
     isDashboard = false,
     onColumnWidthChange,
     sortBy,
-    onHeaderSortClick,
+    renderSortMenu,
     ...tableProps
 }) => {
     const { colorScheme } = useMantineColorScheme();
@@ -993,8 +994,8 @@ const PivotTable: FC<PivotTableProps> = ({
                                     headerRowIndex ===
                                     data.headerValues.length - 1;
 
-                                const titleClickTarget:
-                                    | PivotSortClickTarget
+                                const titleMenuTarget:
+                                    | PivotSortMenuTarget
                                     | undefined =
                                     isIndexTitle && titleField?.fieldId
                                         ? {
@@ -1008,7 +1009,7 @@ const PivotTable: FC<PivotTableProps> = ({
                                             }
                                           : undefined;
                                 const titleIsClickable =
-                                    !!titleClickTarget && !!onHeaderSortClick;
+                                    !!titleMenuTarget && !!renderSortMenu;
                                 const titleSortMatch =
                                     (isIndexTitle || isGroupByTitle) &&
                                     titleField?.fieldId
@@ -1106,52 +1107,49 @@ const PivotTable: FC<PivotTableProps> = ({
                                     >
                                         {titleIsClickable &&
                                         titleField &&
-                                        titleClickTarget &&
-                                        onHeaderSortClick ? (
-                                            <Box
-                                                component="span"
-                                                role="button"
-                                                tabIndex={0}
-                                                onClick={() =>
-                                                    onHeaderSortClick(
-                                                        titleClickTarget,
-                                                    )
-                                                }
-                                                onKeyDown={(
-                                                    e: React.KeyboardEvent,
-                                                ) => {
-                                                    if (
-                                                        e.key === 'Enter' ||
-                                                        e.key === ' '
-                                                    ) {
-                                                        e.preventDefault();
-                                                        onHeaderSortClick(
-                                                            titleClickTarget,
-                                                        );
-                                                    }
-                                                }}
+                                        titleMenuTarget &&
+                                        renderSortMenu ? (
+                                            <Menu
+                                                shadow="md"
+                                                position="bottom-start"
+                                                withinPortal
                                             >
-                                                {titleSortIcon ? (
-                                                    <Group
-                                                        display="inline-flex"
-                                                        spacing={4}
-                                                        noWrap
-                                                        align="center"
+                                                <Menu.Target>
+                                                    <Box
+                                                        component="span"
+                                                        role="button"
+                                                        tabIndex={0}
                                                     >
-                                                        {getFieldLabel(
-                                                            titleField.fieldId,
+                                                        {titleSortIcon ? (
+                                                            <Group
+                                                                display="inline-flex"
+                                                                spacing={4}
+                                                                noWrap
+                                                                align="center"
+                                                            >
+                                                                {getFieldLabel(
+                                                                    titleField.fieldId,
+                                                                )}
+                                                                <MantineIcon
+                                                                    icon={
+                                                                        titleSortIcon
+                                                                    }
+                                                                    size={14}
+                                                                />
+                                                            </Group>
+                                                        ) : (
+                                                            getFieldLabel(
+                                                                titleField.fieldId,
+                                                            )
                                                         )}
-                                                        <MantineIcon
-                                                            icon={titleSortIcon}
-                                                            size={14}
-                                                        />
-                                                    </Group>
-                                                ) : (
-                                                    getFieldLabel(
-                                                        titleField.fieldId,
-                                                    )
-                                                )}
-                                            </Box>
+                                                    </Box>
+                                                </Menu.Target>
+                                                <Menu.Dropdown>
+                                                    {renderSortMenu(
+                                                        titleMenuTarget,
+                                                    )}
+                                                </Menu.Dropdown>
+                                            </Menu>
                                         ) : titleField?.fieldId ? (
                                             getFieldLabel(titleField?.fieldId)
                                         ) : undefined}
@@ -1228,7 +1226,7 @@ const PivotTable: FC<PivotTableProps> = ({
                             const isClickableHeader =
                                 isMetricLabelRow &&
                                 isLabel &&
-                                !!onHeaderSortClick &&
+                                !!renderSortMenu &&
                                 !!columnMetricRef;
                             const sortMatch =
                                 isMetricLabelRow && isLabel
@@ -1274,7 +1272,7 @@ const PivotTable: FC<PivotTableProps> = ({
                                 formatCellContent(headerValue)
                             );
 
-                            const pivotClickTarget: PivotSortClickTarget | null =
+                            const pivotMenuTarget: PivotSortMenuTarget | null =
                                 columnMetricRef && columnIdentity
                                     ? {
                                           kind: 'pivotColumn',
@@ -1307,34 +1305,27 @@ const PivotTable: FC<PivotTableProps> = ({
                                     miw={effectiveWidth}
                                     maw={effectiveWidth}
                                 >
-                                    {isClickableHeader &&
-                                    pivotClickTarget &&
-                                    onHeaderSortClick ? (
-                                        <Box
-                                            component="span"
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={() =>
-                                                onHeaderSortClick(
-                                                    pivotClickTarget,
-                                                )
-                                            }
-                                            onKeyDown={(
-                                                e: React.KeyboardEvent,
-                                            ) => {
-                                                if (
-                                                    e.key === 'Enter' ||
-                                                    e.key === ' '
-                                                ) {
-                                                    e.preventDefault();
-                                                    onHeaderSortClick(
-                                                        pivotClickTarget,
-                                                    );
-                                                }
-                                            }}
+                                    {isClickableHeader && pivotMenuTarget ? (
+                                        <Menu
+                                            shadow="md"
+                                            position="bottom-start"
+                                            withinPortal
                                         >
-                                            {headerInnerContent}
-                                        </Box>
+                                            <Menu.Target>
+                                                <Box
+                                                    component="span"
+                                                    role="button"
+                                                    tabIndex={0}
+                                                >
+                                                    {headerInnerContent}
+                                                </Box>
+                                            </Menu.Target>
+                                            <Menu.Dropdown>
+                                                {renderSortMenu?.(
+                                                    pivotMenuTarget,
+                                                )}
+                                            </Menu.Dropdown>
+                                        </Menu>
                                     ) : (
                                         headerInnerContent
                                     )}
