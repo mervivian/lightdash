@@ -1,4 +1,5 @@
 import {
+    CopyObjectCommand,
     DeleteObjectsCommand,
     GetObjectCommand,
     ListObjectsV2Command,
@@ -825,6 +826,41 @@ export class AppGenerateService extends BaseService {
             `App ${appUuid}: E2B sandbox resumed (sandboxId=${sandbox.sandboxId}, ${durationMs}ms)`,
         );
         return { sandbox, durationMs };
+    }
+
+    /**
+     * Force the sandbox's `/app/src/**` to exactly match the source tarball
+     * stored for `version`. Unlike `restoreSourceFromS3` — which assumes a
+     * fresh `/app/src` and just lays files down — this clears the directory
+     * first so files that existed in the previous working tree but not in
+     * the target tarball are removed. Used by the rollback path so Claude
+     * doesn't read stale leftover files from before the restore.
+     */
+    private async resyncSandboxToVersion(
+        sandbox: Sandbox,
+        s3Client: S3Client,
+        bucket: string,
+        appUuid: string,
+        version: number,
+    ): Promise<number> {
+        const wipe = await sandbox.commands.run(
+            // -mindepth 1 keeps the directory itself; the source.tar
+            // expects `src/` to exist as the extraction root.
+            'find /app/src -mindepth 1 -delete',
+            { timeoutMs: 30_000 },
+        );
+        if (wipe.exitCode !== 0) {
+            throw new Error(
+                `Failed to wipe /app/src before resync (exit ${wipe.exitCode}): ${wipe.stderr}`,
+            );
+        }
+        return this.restoreSourceFromS3(
+            sandbox,
+            s3Client,
+            bucket,
+            appUuid,
+            version,
+        );
     }
 
     private async restoreSourceFromS3(
@@ -2079,11 +2115,35 @@ export class AppGenerateService extends BaseService {
                 if (!advanced) {
                     return;
                 }
+                // If the immediately-prior version is a rollback, the
+                // sandbox's /app/src/** still reflects whatever generation
+                // ran before the restore — and Claude's persistent
+                // conversation has memory of code that's been undone. Both
+                // need correcting before this turn runs.
+                const priorVersion = await this.appModel.getVersion(
+                    appUuid,
+                    version - 1,
+                );
+                const priorWasRestored =
+                    priorVersion?.restored_from_version != null;
+                if (priorWasRestored && priorVersion) {
+                    await this.resyncSandboxToVersion(
+                        sandbox,
+                        s3Client,
+                        bucket,
+                        appUuid,
+                        priorVersion.version,
+                    );
+                }
                 // On retry (currentStatus === 'generating') or iteration
                 // with resumed sandbox, use --continue so Claude picks up
-                // the conversation where it left off.
+                // the conversation where it left off. After a rollback we
+                // drop the session — the prior conversation describes work
+                // that's been undone, so resuming it leads to confused
+                // diffs against a working tree that no longer matches.
                 const continueSession =
-                    currentStatus === 'generating' || wasResumed;
+                    !priorWasRestored &&
+                    (currentStatus === 'generating' || wasResumed);
                 const generation = await this.runClaudeGeneration(
                     sandbox,
                     appUuid,
@@ -3077,6 +3137,134 @@ Each question, when asked, must be a single sentence, 5–15 words.`,
         return { appUuid, version: newVersion };
     }
 
+    /**
+     * Rollback action — duplicate an earlier ready version into a brand-new
+     * ready version on top of the timeline. The duplicate shares the source's
+     * built artifact (server-side S3 copy of `source.tar`) so the preview
+     * iframe can render it immediately without rebuilding.
+     *
+     * The sandbox is NOT synced at this point: the next generation will
+     * detect that the prior ready version is a restore and lazily extract the
+     * tarball into `/app/src/**` then. Restoring without iterating costs a
+     * single DB insert and a CopyObject — nothing else.
+     */
+    async restoreVersion(
+        user: SessionUser,
+        projectUuid: string,
+        appUuid: string,
+        sourceVersion: number,
+    ): Promise<{ appUuid: string; version: number }> {
+        await this.assertDataAppsEnabled(user);
+
+        const app = await this.appModel.getApp(appUuid, projectUuid);
+        await this.assertCanManageApp(
+            user,
+            app,
+            'Insufficient permissions to modify data apps',
+        );
+
+        const latestVersion = await this.appModel.getLatestVersion(appUuid);
+        if (
+            latestVersion?.status &&
+            isAppVersionInProgress(latestVersion.status)
+        ) {
+            // An in-flight generation would publish on top of the restore
+            // and silently win the version race. Refuse early.
+            throw new ParameterError(
+                'A version is already building for this app',
+            );
+        }
+        if (latestVersion && latestVersion.version === sourceVersion) {
+            // No-op: restoring the latest onto itself would create a
+            // duplicate row with no semantic meaning.
+            throw new ParameterError(
+                `Version ${sourceVersion} is already the latest version`,
+            );
+        }
+
+        const source = await this.appModel.getVersion(appUuid, sourceVersion);
+        if (!source) {
+            throw new NotFoundError(
+                `Version ${sourceVersion} not found for app ${appUuid}`,
+            );
+        }
+        if (source.status !== 'ready') {
+            throw new ParameterError(
+                `Cannot restore version ${sourceVersion}: status is ${source.status}, expected ready`,
+            );
+        }
+
+        const newVersion = (latestVersion?.version ?? 0) + 1;
+
+        // Server-side copy of the built artifact — bytes never touch the
+        // backend pod.
+        const { client: s3Client, bucket } = this.getS3Client();
+        const sourceKey = `apps/${appUuid}/versions/${sourceVersion}/source.tar`;
+        const destinationKey = `apps/${appUuid}/versions/${newVersion}/source.tar`;
+        await s3Client.send(
+            new CopyObjectCommand({
+                Bucket: bucket,
+                CopySource: `/${bucket}/${sourceKey}`,
+                Key: destinationKey,
+            }),
+        );
+
+        // The chat bubble surfaces `prompt` as the message body. Use a
+        // marker rather than copying the source's prompt verbatim — copying
+        // would falsely suggest the user re-typed it.
+        const marker = `Restored from version ${sourceVersion}`;
+        try {
+            await this.appModel.createVersion(
+                appUuid,
+                { version: newVersion, prompt: marker },
+                'ready',
+                user.userUuid,
+                source.resources ?? undefined,
+                {
+                    restoredFromVersion: sourceVersion,
+                    statusMessage: marker,
+                    statusUpdatedAt: new Date(),
+                },
+            );
+        } catch (error) {
+            // Best-effort cleanup of the orphaned tarball if the DB insert
+            // fails (e.g. UNIQUE collision from a race). Swallow cleanup
+            // errors — the original DB error is what the caller cares
+            // about and a leftover object is harmless.
+            try {
+                await s3Client.send(
+                    new DeleteObjectsCommand({
+                        Bucket: bucket,
+                        Delete: { Objects: [{ Key: destinationKey }] },
+                    }),
+                );
+            } catch (cleanupError) {
+                this.logger.warn(
+                    `App ${appUuid}: failed to clean up orphaned restore tarball ${destinationKey}: ${getErrorMessage(cleanupError)}`,
+                );
+            }
+            throw error;
+        }
+
+        this.analytics.track({
+            event: 'data_app.version.restored',
+            userId: user.userUuid,
+            properties: {
+                organizationId: user.organizationUuid!,
+                projectId: projectUuid,
+                appUuid,
+                version: newVersion,
+                restoredFromVersion: sourceVersion,
+            },
+        });
+
+        this.logger.info(
+            `App ${appUuid}: restored version ${sourceVersion} as ${newVersion} (user=${user.userUuid})`,
+        );
+
+        return { appUuid, version: newVersion };
+    }
+
     async cancelVersion(
         user: SessionUser,
         projectUuid: string,
@@ -3177,6 +3365,7 @@ Each question, when asked, must be a single sentence, 5–15 words.`,
                 lastName: string;
             } | null;
             resources: AppVersionResources | null;
+            restoredFromVersion: number | null;
         }[];
         hasMore: boolean;
     }> {
@@ -3238,6 +3427,7 @@ Each question, when asked, must be a single sentence, 5–15 words.`,
                               lastName: v.created_by_user_last_name,
                           }
                         : null,
+                restoredFromVersion: v.restored_from_version,
             })),
             hasMore,
         };

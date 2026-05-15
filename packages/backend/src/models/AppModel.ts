@@ -266,6 +266,15 @@ export class AppModel {
         status: AppVersionStatus,
         createdByUserUuid: string,
         resources?: AppVersionResources,
+        // Optional rollback marker: when set, the row is recorded as a
+        // restore of the given source version and the row's status_message
+        // / status_updated_at are set up-front so the chat UI reflects the
+        // restore moment.
+        restoreOpts?: {
+            restoredFromVersion: number;
+            statusMessage: string;
+            statusUpdatedAt: Date;
+        },
     ): Promise<DbAppVersion> {
         const [row] = await this.database(AppVersionsTableName)
             .insert({
@@ -278,6 +287,14 @@ export class AppModel {
                           resources: JSON.stringify(
                               resources,
                           ) as unknown as AppVersionResources,
+                      }
+                    : {}),
+                ...(restoreOpts
+                    ? {
+                          restored_from_version:
+                              restoreOpts.restoredFromVersion,
+                          status_message: restoreOpts.statusMessage,
+                          status_updated_at: restoreOpts.statusUpdatedAt,
                       }
                     : {}),
             })

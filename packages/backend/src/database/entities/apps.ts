@@ -71,6 +71,9 @@ export type DbAppVersion = {
     resources: AppVersionResources | null;
     created_at: Date;
     created_by_user_uuid: string;
+    // Non-null on rows produced by the rollback action — carries the
+    // source version number. Null on every generation.
+    restored_from_version: number | null;
 };
 
 export type AppVersionsTable = Knex.CompositeTableType<
@@ -79,7 +82,12 @@ export type AppVersionsTable = Knex.CompositeTableType<
         DbAppVersion,
         'app_id' | 'version' | 'prompt' | 'status' | 'created_by_user_uuid'
     > &
-        Partial<Pick<DbAppVersion, 'app_version_id' | 'resources'>>,
+        Partial<
+            Pick<
+                DbAppVersion,
+                'app_version_id' | 'resources' | 'restored_from_version'
+            >
+        >,
     Partial<
         Pick<
             DbAppVersion,
