@@ -23,3 +23,5 @@ minimumReleaseAgeExclude:
   - yaml@2.8.3
   # Renovate security update: systeminformation@5.31.6
   - systeminformation@5.31.6
+  # Renovate security update: i18next-locize-backend@9.0.2
+  - i18next-locize-backend@9.0.2
