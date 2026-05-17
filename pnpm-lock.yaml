@@ -220,8 +220,8 @@ importers:
         specifier: 1.29.0
         version: 1.29.0(zod@3.25.55)
       '@node-oauth/oauth2-server':
-        specifier: 5.2.0
-        version: 5.2.0
+        specifier: 5.3.0
+        version: 5.3.0
       '@octokit/app':
         specifier: 14.0.2
         version: 14.0.2
@@ -4126,8 +4126,8 @@ packages:
   '@node-oauth/formats@1.0.0':
     resolution: {integrity: sha512-DwSbLtdC8zC5B5gTJkFzJj5s9vr9SGzOgQvV9nH7tUVuMSScg0EswAczhjIapOmH3Y8AyP7C4Jv7b8+QJObWZA==}
 
-  '@node-oauth/oauth2-server@5.2.0':
-    resolution: {integrity: sha512-tbw0aHPk1Pu/HmQlll4unYd+VHwoagbAmUBLys5g6hDh9khcKzTmE77Z0myMG5a66w3Yk3xBwCRPX9a7M+HTqA==}
+  '@node-oauth/oauth2-server@5.3.0':
+    resolution: {integrity: sha512-gPnLZesfXWleX3Mwq9hch3yY9AiekT+cl+c99BoK7Yf/DQEoxXsvuVDG/D0MrPkFbfiOdR96Z88ZYZJkvQ5lAw==}
     engines: {node: '>=16.0.0'}
 
   '@nodelib/fs.scandir@2.1.5':
@@ -20287,11 +20287,11 @@ snapshots:
 
   '@node-oauth/formats@1.0.0': {}
 
-  '@node-oauth/oauth2-server@5.2.0':
+  '@node-oauth/oauth2-server@5.3.0':
     dependencies:
       '@node-oauth/formats': 1.0.0
       basic-auth: 2.0.1
-      type-is: 1.6.18
+      type-is: 2.0.1
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
